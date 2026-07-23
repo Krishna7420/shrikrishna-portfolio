@@ -6,16 +6,9 @@ import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 /* ---------- EDIT THIS with your real journey ---------- */
 
 const milestones = [
+  
   {
-    date: "Mar 2026 — Present",
-    title: "iOS Developer Intern",
-    place: "Theze · Remote",
-    detail:
-      "Building production iOS features with Swift and SwiftUI in a real product team.",
-    icon: "💼",
-  },
-  {
-    date: "2025",
+    date: "2026",
     title: "Shipped Blink",
     place: "Personal Project",
     detail:
@@ -23,7 +16,7 @@ const milestones = [
     icon: "👁️",
   },
   {
-    date: "2025",
+    date: "2026",
     title: "Built iWord Scramble",
     place: "Personal Project",
     detail:
