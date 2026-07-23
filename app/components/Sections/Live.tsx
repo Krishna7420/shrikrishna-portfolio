@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
@@ -16,6 +16,7 @@ type Thought = {
   created_at: string;
   media_url: string | null;
   media_type: string | null;
+  likes: number;
 };
 
 function timeAgo(iso: string): string {
@@ -33,7 +34,154 @@ function timeAgo(iso: string): string {
   });
 }
 
-/* ---------- Decoding text (types itself out with glitch chars) ---------- */
+/* ---------- Liked-posts memory (per browser) ---------- */
+
+function useLikedSet() {
+  const [liked, setLiked] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("liked-thoughts");
+      if (raw) setLiked(new Set(JSON.parse(raw)));
+    } catch {}
+  }, []);
+
+  const toggle = (id: number) => {
+    setLiked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem("liked-thoughts", JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  return { liked, toggle };
+}
+
+/* ---------- Like button ---------- */
+
+function LikeButton({
+  thought,
+  isLiked,
+  onToggle,
+}: {
+  thought: Thought;
+  isLiked: boolean;
+  onToggle: (id: number) => void;
+}) {
+  const [count, setCount] = useState(thought.likes);
+  const [burst, setBurst] = useState(0);
+
+  const handleClick = async () => {
+    const nowLiked = !isLiked;
+    onToggle(thought.id);
+    setCount((c) => (nowLiked ? c + 1 : Math.max(c - 1, 0)));
+    if (nowLiked) setBurst((b) => b + 1);
+
+    try {
+      if (nowLiked) {
+        await supabase.rpc("increment_like", { thought_id: thought.id });
+      } else {
+        await supabase.rpc("decrement_like", { thought_id: thought.id });
+      }
+    } catch {
+      // silent — optimistic UI already updated, worst case count drifts slightly
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className="relative flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs backdrop-blur-xl transition hover:border-pink-400/40"
+    >
+      <span className="relative inline-flex h-4 w-4 items-center justify-center">
+        <AnimatePresence>
+          {burst > 0 && (
+            <motion.span
+              key={burst}
+              initial={{ scale: 0.6, opacity: 1 }}
+              animate={{ scale: 2.2, opacity: 0 }}
+              transition={{ duration: 0.5 }}
+              className="absolute text-pink-400"
+            >
+              ♥
+            </motion.span>
+          )}
+        </AnimatePresence>
+        <motion.span
+          animate={isLiked ? { scale: [1, 1.4, 1] } : { scale: 1 }}
+          transition={{ duration: 0.35 }}
+          className={isLiked ? "text-pink-400" : "text-zinc-400"}
+        >
+          {isLiked ? "♥" : "♡"}
+        </motion.span>
+      </span>
+      <span className={isLiked ? "text-pink-300" : "text-zinc-400"}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+/* ---------- Share button ---------- */
+
+function ShareButton({ thought }: { thought: Thought }) {
+  const [copied, setCopied] = useState(false);
+
+  const shareUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/live#t-${thought.id}`
+      : "";
+
+  const handleShare = async () => {
+    const shareData = {
+      title: "Shrikrishna Thodsare — Live",
+      text: thought.text || "Check this out",
+      url: shareUrl,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // user cancelled — no-op
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      } catch {}
+    }
+  };
+
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
+    `${thought.text ? thought.text + " — " : ""}${shareUrl}`
+  )}`;
+
+ return (
+  <div className="flex items-center gap-2">
+    <button
+      onClick={handleShare}
+      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-zinc-400 backdrop-blur-xl transition hover:border-cyan-400/40 hover:text-cyan-300"
+    >
+      ↗ {copied ? "Copied!" : "Share"}
+    </button>
+
+    <a
+      href={whatsappUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-zinc-400 backdrop-blur-xl transition hover:border-green-400/40 hover:text-green-300"
+    >
+      WhatsApp
+    </a>
+  </div>
+);
+}
+
+/* ---------- Decoding text ---------- */
 
 const GLITCH = "█▓▒░<>/\\|10";
 
@@ -74,7 +222,7 @@ function DecodeText({ text }: { text: string }) {
   );
 }
 
-/* ---------- Media block (social-post style) ---------- */
+/* ---------- Generic media (used only for Latest Transmission) ---------- */
 
 function Media({ thought }: { thought: Thought }) {
   if (!thought.media_url) return null;
@@ -105,7 +253,7 @@ function Media({ thought }: { thought: Thought }) {
   );
 }
 
-/* ---------- Signal ring (pulsing "broadcasting" indicator) ---------- */
+/* ---------- Signal ring ---------- */
 
 function SignalRing() {
   return (
@@ -114,12 +262,7 @@ function SignalRing() {
         <motion.span
           key={i}
           animate={{ scale: [1, 2.8], opacity: [0.7, 0] }}
-          transition={{
-            repeat: Infinity,
-            duration: 2,
-            delay: i * 1,
-            ease: "easeOut",
-          }}
+          transition={{ repeat: Infinity, duration: 2, delay: i * 1, ease: "easeOut" }}
           className="absolute inline-flex h-full w-full rounded-full bg-green-400"
         />
       ))}
@@ -128,10 +271,62 @@ function SignalRing() {
   );
 }
 
+/* ---------- Photo lightbox ---------- */
+
+function Lightbox({
+  thought,
+  onClose,
+  isLiked,
+  onToggleLike,
+}: {
+  thought: Thought;
+  onClose: () => void;
+  isLiked: boolean;
+  onToggleLike: (id: number) => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="glass max-w-lg overflow-hidden rounded-3xl border border-white/10"
+      >
+        <img
+          src={thought.media_url!}
+          alt=""
+          className="max-h-[75vh] w-full object-contain bg-black"
+        />
+        <div className="flex flex-col gap-3 p-5">
+          {thought.text && (
+            <p className="text-sm leading-7 text-zinc-300">{thought.text}</p>
+          )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <LikeButton thought={thought} isLiked={isLiked} onToggle={onToggleLike} />
+              <ShareButton thought={thought} />
+            </div>
+            <span className="text-xs text-zinc-500">{timeAgo(thought.created_at)}</span>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ---------- Section ---------- */
 
 export default function Live({ preview = false }: { preview?: boolean }) {
   const [thoughts, setThoughts] = useState<Thought[]>([]);
+  const [lightboxId, setLightboxId] = useState<number | null>(null);
+  const { liked, toggle } = useLikedSet();
 
   useEffect(() => {
     supabase
@@ -140,11 +335,17 @@ export default function Live({ preview = false }: { preview?: boolean }) {
       .order("created_at", { ascending: false })
       .limit(preview ? 1 : 50)
       .then(({ data }) => {
-        if (data) setThoughts(data);
+        if (data) setThoughts(data as Thought[]);
       });
   }, [preview]);
 
   const [latest, ...older] = thoughts;
+
+  const photoThoughts = older.filter((t) => t.media_type === "image");
+  const videoThoughts = older.filter((t) => t.media_type === "video");
+  const textThoughts = older.filter((t) => !t.media_type);
+
+  const lightboxThought = photoThoughts.find((t) => t.id === lightboxId) || null;
 
   return (
     <section
@@ -209,28 +410,26 @@ export default function Live({ preview = false }: { preview?: boolean }) {
         </motion.p>
       </div>
 
-      {/* Latest transmission — featured */}
+      {/* Latest transmission */}
       {latest && (
         <motion.article
+          id={`t-${latest.id}`}
           initial={{ opacity: 0, y: 60, filter: "blur(16px)", scale: 0.95 }}
           whileInView={{ opacity: 1, y: 0, filter: "blur(0px)", scale: 1 }}
           viewport={{ once: false, margin: "-10%" }}
           transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
           className="relative mt-14 overflow-hidden rounded-[32px] bg-black p-7 sm:p-10"
         >
-          {/* Rotating conic border */}
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
             className="pointer-events-none absolute -inset-[2px] -z-10 rounded-[32px] opacity-70"
             style={{
-              background:
-                "conic-gradient(from 0deg, #3b82f6, #a855f7, #22d3ee, #3b82f6)",
+              background: "conic-gradient(from 0deg, #3b82f6, #a855f7, #22d3ee, #3b82f6)",
             }}
           />
           <div className="pointer-events-none absolute inset-[1.5px] -z-10 rounded-[32px] bg-black" />
 
-          {/* Breathing inner atmosphere */}
           <motion.div
             animate={{ opacity: [0.05, 0.15, 0.05] }}
             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
@@ -245,18 +444,24 @@ export default function Live({ preview = false }: { preview?: boolean }) {
           <Media thought={latest} />
           {latest.text && <DecodeText text={latest.text} />}
 
-          <div className="relative mt-6 flex items-center gap-2 text-xs text-zinc-500">
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-xl">
-              {timeAgo(latest.created_at)}
-            </span>
-            <span className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-cyan-300/70 backdrop-blur-xl">
-              via telegram
-            </span>
+          <div className="relative mt-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-500 backdrop-blur-xl">
+                {timeAgo(latest.created_at)}
+              </span>
+              <span className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-xs text-cyan-300/70 backdrop-blur-xl">
+                via telegram
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <LikeButton thought={latest} isLiked={liked.has(latest.id)} onToggle={toggle} />
+              <ShareButton thought={latest} />
+            </div>
           </div>
         </motion.article>
       )}
 
-      {/* Preview mode: link to the full live page */}
+      {/* Preview mode: link to full page */}
       {preview && latest && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -271,73 +476,162 @@ export default function Live({ preview = false }: { preview?: boolean }) {
           >
             <span className="relative flex items-center gap-2">
               View all transmissions
-              <span className="transition-transform group-hover:translate-x-1">
-                →
-              </span>
+              <span className="transition-transform group-hover:translate-x-1">→</span>
             </span>
           </Link>
         </motion.div>
       )}
 
-      {/* Older transmissions along a beam — full page only */}
-      {!preview && older.length > 0 && (
-        <div className="relative mt-16">
-          {/* Glowing beam */}
-          <div className="absolute left-4 top-0 h-full w-[2px] -translate-x-1/2 bg-gradient-to-b from-cyan-400/40 via-blue-500/20 to-transparent sm:left-6" />
+      {!preview && (
+        <>
+          {/* Photos — horizontal scroll row */}
+          {photoThoughts.length > 0 && (
+            <div className="mt-16">
+              <h3 className="mb-4 text-sm uppercase tracking-[0.2em] text-zinc-500">
+                Snapshots
+              </h3>
+              <div className="flex gap-4 overflow-x-auto pb-4 [scrollbar-width:thin] snap-x snap-mandatory">
+                {photoThoughts.map((thought) => (
+                  <motion.button
+                    key={thought.id}
+                    id={`t-${thought.id}`}
+                    onClick={() => setLightboxId(thought.id)}
+                    initial={{ opacity: 0, x: 30 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: false, margin: "-10%" }}
+                    whileHover={{ scale: 1.03 }}
+                    transition={{ duration: 0.5 }}
+                    className="group relative h-56 w-40 shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 sm:h-64 sm:w-48"
+                  >
+                    <img
+                      src={thought.media_url!}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                    <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] text-zinc-300 backdrop-blur-xl">
+                      ♥ {thought.likes}
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div className="flex flex-col gap-8">
-            {older.map((thought, i) => (
-              <motion.article
-                key={thought.id}
-                initial={{ opacity: 0, x: 30, filter: "blur(12px)" }}
-                whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                viewport={{ once: false, margin: "-12% 0px -12% 0px" }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={{ y: -4 }}
-                className="glass group relative ml-10 overflow-hidden rounded-3xl border border-white/10 p-6 sm:ml-14 sm:p-8 transition-shadow duration-500 hover:shadow-[0_0_50px_rgba(59,130,246,0.2)]"
-              >
-                {/* Node on beam */}
-                <motion.span
-                  initial={{ scale: 0 }}
-                  whileInView={{ scale: 1 }}
-                  viewport={{ once: false, margin: "-12%" }}
-                  transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                  className="absolute -left-[26px] top-8 h-3 w-3 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.8)] sm:-left-[34px]"
-                />
+          {/* Videos — grid */}
+          {videoThoughts.length > 0 && (
+            <div className="mt-16">
+              <h3 className="mb-4 text-sm uppercase tracking-[0.2em] text-zinc-500">
+                Clips
+              </h3>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {videoThoughts.map((thought) => (
+                  <motion.div
+                    key={thought.id}
+                    id={`t-${thought.id}`}
+                    initial={{ opacity: 0, y: 30, filter: "blur(10px)" }}
+                    whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    viewport={{ once: false, margin: "-10%" }}
+                    transition={{ duration: 0.6 }}
+                    className="glass overflow-hidden rounded-2xl border border-white/10"
+                  >
+                    <video
+                      src={thought.media_url!}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="max-h-[360px] w-full bg-black object-contain"
+                    />
+                    <div className="flex flex-col gap-3 p-4">
+                      {thought.text && (
+                        <p className="text-sm text-zinc-300">{thought.text}</p>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-zinc-500">
+                          {timeAgo(thought.created_at)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <LikeButton
+                            thought={thought}
+                            isLiked={liked.has(thought.id)}
+                            onToggle={toggle}
+                          />
+                          <ShareButton thought={thought} />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                {/* Passing wisp */}
-                <motion.div
-                  animate={{ x: ["-150%", "150%"] }}
-                  transition={{
-                    repeat: Infinity,
-                    duration: 6,
-                    delay: i * 0.7,
-                    ease: "easeInOut",
-                  }}
-                  className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-                />
+          {/* Text-only thoughts — ghost timeline beam */}
+          {textThoughts.length > 0 && (
+            <div className="relative mt-16">
+              <div className="absolute left-4 top-0 h-full w-[2px] -translate-x-1/2 bg-gradient-to-b from-cyan-400/40 via-blue-500/20 to-transparent sm:left-6" />
 
-                <Media thought={thought} />
+              <div className="flex flex-col gap-8">
+                {textThoughts.map((thought, i) => (
+                  <motion.article
+                    key={thought.id}
+                    id={`t-${thought.id}`}
+                    initial={{ opacity: 0, x: 30, filter: "blur(12px)" }}
+                    whileInView={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                    viewport={{ once: false, margin: "-12% 0px -12% 0px" }}
+                    transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ y: -4 }}
+                    className="glass group relative ml-10 overflow-hidden rounded-3xl border border-white/10 p-6 sm:ml-14 sm:p-8 transition-shadow duration-500 hover:shadow-[0_0_50px_rgba(59,130,246,0.2)]"
+                  >
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      whileInView={{ scale: 1 }}
+                      viewport={{ once: false, margin: "-12%" }}
+                      transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                      className="absolute -left-[26px] top-8 h-3 w-3 rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.8)] sm:-left-[34px]"
+                    />
+                    <motion.div
+                      animate={{ x: ["-150%", "150%"] }}
+                      transition={{ repeat: Infinity, duration: 6, delay: i * 0.7, ease: "easeInOut" }}
+                      className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                    />
 
-                {thought.text && (
-                  <p className="relative text-base leading-8 text-zinc-300 whitespace-pre-line">
-                    {thought.text}
-                  </p>
-                )}
+                    <p className="relative text-base leading-8 text-zinc-300 whitespace-pre-line">
+                      {thought.text}
+                    </p>
 
-                <div className="relative mt-5 flex items-center gap-2 text-xs text-zinc-500">
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-xl">
-                    {timeAgo(thought.created_at)}
-                  </span>
-                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-cyan-300/70 backdrop-blur-xl">
-                    via telegram
-                  </span>
-                </div>
-              </motion.article>
-            ))}
-          </div>
-        </div>
+                    <div className="relative mt-5 flex flex-wrap items-center justify-between gap-3">
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-500 backdrop-blur-xl">
+                        {timeAgo(thought.created_at)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <LikeButton
+                          thought={thought}
+                          isLiked={liked.has(thought.id)}
+                          onToggle={toggle}
+                        />
+                        <ShareButton thought={thought} />
+                      </div>
+                    </div>
+                  </motion.article>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightboxThought && (
+          <Lightbox
+            thought={lightboxThought}
+            onClose={() => setLightboxId(null)}
+            isLiked={liked.has(lightboxThought.id)}
+            onToggleLike={toggle}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }
