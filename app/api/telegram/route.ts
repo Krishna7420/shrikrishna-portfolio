@@ -11,6 +11,14 @@ function getSupabase() {
   );
 }
 
+async function sendTelegramMessage(chatId: number, text: string) {
+  await fetch(`${TG}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text }),
+  });
+}
+
 async function downloadTelegramFile(
   fileId: string
 ): Promise<{ buffer: ArrayBuffer; path: string } | null> {
@@ -39,6 +47,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    const chatId = message.chat.id as number;
+
     let text = message.text || message.caption || "";
     let mediaUrl: string | null = null;
     let mediaType: string | null = null;
@@ -52,12 +62,14 @@ export async function POST(request: Request) {
         const { error } = await supabase.storage
           .from("thoughts-media")
           .upload(name, file.buffer, { contentType: "image/jpeg" });
-        if (!error) {
-          mediaUrl = supabase.storage
-            .from("thoughts-media")
-            .getPublicUrl(name).data.publicUrl;
-          mediaType = "image";
+        if (error) {
+          await sendTelegramMessage(chatId, `❌ image upload failed: ${error.message}`);
+          return NextResponse.json({ ok: true });
         }
+        mediaUrl = supabase.storage
+          .from("thoughts-media")
+          .getPublicUrl(name).data.publicUrl;
+        mediaType = "image";
       }
     }
 
@@ -72,32 +84,35 @@ export async function POST(request: Request) {
           .upload(name, file.buffer, {
             contentType: message.video.mime_type || "video/mp4",
           });
-        if (!error) {
-          mediaUrl = supabase.storage
-            .from("thoughts-media")
-            .getPublicUrl(name).data.publicUrl;
-          mediaType = "video";
+        if (error) {
+          await sendTelegramMessage(chatId, `❌ video upload failed: ${error.message}`);
+          return NextResponse.json({ ok: true });
         }
+        mediaUrl = supabase.storage
+          .from("thoughts-media")
+          .getPublicUrl(name).data.publicUrl;
+        mediaType = "video";
       }
     }
 
     // Ignore empty updates (stickers, joins, etc.)
     if (!text && !mediaUrl) return NextResponse.json({ ok: true });
 
-    await supabase.from("thoughts").insert({
+    const { error: insertError } = await supabase.from("thoughts").insert({
       text,
       media_url: mediaUrl,
       media_type: mediaType,
     });
 
-    await fetch(`${TG}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: message.chat.id,
-        text: mediaUrl ? `✅ posted with ${mediaType}` : "✅ posted",
-      }),
-    });
+    if (insertError) {
+      await sendTelegramMessage(chatId, `❌ failed: ${insertError.message}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    await sendTelegramMessage(
+      chatId,
+      mediaUrl ? `✅ posted with ${mediaType}` : "✅ posted"
+    );
 
     return NextResponse.json({ ok: true });
   } catch {
