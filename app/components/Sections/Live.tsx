@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -130,7 +131,7 @@ function SignalRing() {
 
 /* ---------- Section ---------- */
 
-export default function Live() {
+export default function Live({ preview = false }: { preview?: boolean }) {
   const [thoughts, setThoughts] = useState<Thought[]>([]);
 
   useEffect(() => {
@@ -138,11 +139,11 @@ export default function Live() {
       .from("thoughts")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(preview ? 1 : 50)
       .then(({ data }) => {
         if (data) setThoughts(data);
       });
-  }, []);
+  }, [preview]);
 
   const [latest, ...older] = thoughts;
 
@@ -256,8 +257,31 @@ export default function Live() {
         </motion.article>
       )}
 
-      {/* Older transmissions along a beam */}
-      {older.length > 0 && (
+      {/* Preview mode: link to the full live page */}
+      {preview && latest && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mt-10 flex justify-center"
+        >
+          <Link
+            href="/live"
+            className="glass group relative overflow-hidden rounded-2xl border border-white/10 px-8 py-4 font-semibold transition hover:scale-105 hover:shadow-[0_0_40px_rgba(59,130,246,0.3)]"
+          >
+            <span className="relative flex items-center gap-2">
+              View all transmissions
+              <span className="transition-transform group-hover:translate-x-1">
+                →
+              </span>
+            </span>
+          </Link>
+        </motion.div>
+      )}
+
+      {/* Older transmissions along a beam — full page only */}
+      {!preview && older.length > 0 && (
         <div className="relative mt-16">
           {/* Glowing beam */}
           <div className="absolute left-4 top-0 h-full w-[2px] -translate-x-1/2 bg-gradient-to-b from-cyan-400/40 via-blue-500/20 to-transparent sm:left-6" />

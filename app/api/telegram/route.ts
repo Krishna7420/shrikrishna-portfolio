@@ -73,16 +73,17 @@ export async function POST(request: Request) {
       }
     }
 
-    // Video
-    if (message.video) {
-      const file = await downloadTelegramFile(message.video.file_id);
+    // Video (regular, GIF/animation, or round video note)
+    const videoLike = message.video || message.animation || message.video_note;
+    if (videoLike) {
+      const file = await downloadTelegramFile(videoLike.file_id);
       if (file) {
         const ext = file.path.split(".").pop() || "mp4";
         const name = `videos/${Date.now()}.${ext}`;
         const { error } = await supabase.storage
           .from("thoughts-media")
           .upload(name, file.buffer, {
-            contentType: message.video.mime_type || "video/mp4",
+            contentType: videoLike.mime_type || "video/mp4",
           });
         if (error) {
           await sendTelegramMessage(chatId, `❌ video upload failed: ${error.message}`);
@@ -92,9 +93,14 @@ export async function POST(request: Request) {
           .from("thoughts-media")
           .getPublicUrl(name).data.publicUrl;
         mediaType = "video";
+      } else {
+        await sendTelegramMessage(
+          chatId,
+          "❌ couldn't download video from Telegram (file may be too large or expired)"
+        );
+        return NextResponse.json({ ok: true });
       }
     }
-
     // Ignore empty updates (stickers, joins, etc.)
     if (!text && !mediaUrl) return NextResponse.json({ ok: true });
 
