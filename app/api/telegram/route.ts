@@ -70,10 +70,13 @@ export async function POST(request: Request) {
           .from("thoughts-media")
           .getPublicUrl(name).data.publicUrl;
         mediaType = "image";
+      } else {
+        await sendTelegramMessage(chatId, "❌ couldn't download photo from Telegram");
+        return NextResponse.json({ ok: true });
       }
     }
 
-    // Video (regular, GIF/animation, or round video note)
+    // Video — covers regular videos, GIF/animations, and round video notes
     const videoLike = message.video || message.animation || message.video_note;
     if (videoLike) {
       const file = await downloadTelegramFile(videoLike.file_id);
@@ -96,11 +99,12 @@ export async function POST(request: Request) {
       } else {
         await sendTelegramMessage(
           chatId,
-          "❌ couldn't download video from Telegram (file may be too large or expired)"
+          "❌ couldn't download video from Telegram (file may be too large — try a shorter clip)"
         );
         return NextResponse.json({ ok: true });
       }
     }
+
     // Ignore empty updates (stickers, joins, etc.)
     if (!text && !mediaUrl) return NextResponse.json({ ok: true });
 
