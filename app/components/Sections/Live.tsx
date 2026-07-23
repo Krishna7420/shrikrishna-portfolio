@@ -83,13 +83,13 @@ function Media({ thought }: { thought: Thought }) {
     <motion.div
       whileHover={{ scale: 1.015 }}
       transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      className="relative mb-6 overflow-hidden rounded-2xl border border-white/10"
+      className="relative mx-auto mb-6 flex max-w-md justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/40 sm:max-w-lg"
     >
       {thought.media_type === "image" ? (
         <img
           src={thought.media_url}
           alt=""
-          className="max-h-[480px] w-full object-cover"
+          className="max-h-[70vh] w-auto max-w-full object-contain"
         />
       ) : (
         <video
@@ -97,10 +97,9 @@ function Media({ thought }: { thought: Thought }) {
           controls
           playsInline
           preload="metadata"
-          className="max-h-[480px] w-full bg-black"
+          className="max-h-[70vh] w-auto max-w-full bg-black object-contain"
         />
       )}
-      {/* Glass shine across media */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-transparent" />
     </motion.div>
   );
