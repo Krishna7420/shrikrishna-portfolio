@@ -55,7 +55,7 @@ const stories: Story[] = [
       "पंढरपूरचे विठ्ठल-रुक्मिणी मंदिर अनेक शतकांमध्ये विकसित झाले असून त्याचे सर्वात जुने भाग मध्ययुगीन यादव कालखंडातील आहेत, तर मराठा कालखंडातही त्यात भर पडत राहिली. काळ्या बेसाल्ट दगडात हेमाडपंथी शैलीत बांधलेल्या या मंदिराला टप्प्याटप्प्याचे शिखर, दर्शनासाठी वारकरी जमतात असा खुला सभामंडप, आणि विठ्ठलाच्या वाहनाची प्रतिमा असलेला गरुड मंडप आहे.",
     bodyEnglish:
       "The Vitthal-Rukmini temple at Pandharpur has grown over many centuries, with its oldest sections dating to the medieval Yadava period and additions continuing through the Maratha era. Built largely from black basalt stone in the Hemadpanthi style, it features a stepped shikhara (spire), an open sabha mandap (assembly hall) where pilgrims gather for darshan, and a Garud Mandap housing an image of Vitthal's divine vehicle.",
-    image: "/festival/temple.png",
+    image: "/festival/Temple.png",
     side: "left",
   },
 ];
