@@ -7,6 +7,7 @@ import Experience from "./components/Sections/Experience";
 import Contact from "./components/Sections/Contact";
 import ScrollApple from "./components/three/ScrollApple";
 import Live from "./components/Sections/Live";
+import TodaysEventCard from "./components/TodaysEventCard";
 
 
 
@@ -19,6 +20,7 @@ export default function Home() {
       <div className="relative z-10">
 
         <Navbar />
+        <TodaysEventCard />
         <Hero />
         <About />
         <ScrollApple />
