@@ -21,7 +21,7 @@ export const festivals: Festival[] = [
     emoji: "🙏",
     date: "2026-07-25",
     tagline: "A moment of devotion, from Pandharpur to wherever you are.",
-    darshanVideoId: "ylnWpKgIp-A",
+    darshanVideoId: "ISNSv72oc7k",
     bhajanVideoIds: ["Z8bDdMNmQV0", "_uIbYaZARi8", "qcscBr_USZE", "GYK677Y8d2M"],
     bhajanTracks: [
       {
