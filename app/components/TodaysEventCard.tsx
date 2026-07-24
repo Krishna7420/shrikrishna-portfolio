@@ -12,20 +12,33 @@ function localDateKey(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
+function checkFestivals(): { festival: Festival; when: "today" | "tomorrow" } | null {
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+
+  const todayFestival = festivals.find((f) => f.date === localDateKey(today));
+  const tomorrowFestival = festivals.find((f) => f.date === localDateKey(tomorrow));
+
+  if (todayFestival) return { festival: todayFestival, when: "today" };
+  if (tomorrowFestival) return { festival: tomorrowFestival, when: "tomorrow" };
+  return null;
+}
+
 export default function TodaysEventCard() {
   const [match, setMatch] = useState<{ festival: Festival; when: "today" | "tomorrow" } | null>(null);
 
   useEffect(() => {
-    const today = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
+    // Check immediately on mount
+    setMatch(checkFestivals());
 
-    const todayFestival = festivals.find((f) => f.date === localDateKey(today));
-    const tomorrowFestival = festivals.find((f) => f.date === localDateKey(tomorrow));
+    // Then re-check every minute, so it flips from "Tomorrow" to "Today"
+    // automatically at midnight without needing a page refresh
+    const interval = setInterval(() => {
+      setMatch(checkFestivals());
+    }, 60 * 1000);
 
-    if (todayFestival) setMatch({ festival: todayFestival, when: "today" });
-    else if (tomorrowFestival) setMatch({ festival: tomorrowFestival, when: "tomorrow" });
-    else setMatch(null);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -49,7 +62,9 @@ export default function TodaysEventCard() {
                 style={{ background: `${match.festival.glowColor}22` }}
               >
                 <span className="text-[9px] uppercase leading-none text-zinc-400">
-                  {new Date(match.festival.date + "T00:00:00").toLocaleDateString("en-US", { month: "short" })}
+                  {new Date(match.festival.date + "T00:00:00").toLocaleDateString("en-US", {
+                    month: "short",
+                  })}
                 </span>
                 <span className="text-lg font-bold leading-none" style={{ color: match.festival.glowColor }}>
                   {new Date(match.festival.date + "T00:00:00").getDate()}
@@ -59,14 +74,19 @@ export default function TodaysEventCard() {
               <div className="text-left">
                 <span
                   className="mr-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                  style={{ background: `${match.festival.glowColor}33`, color: match.festival.glowColor }}
+                  style={{
+                    background: `${match.festival.glowColor}33`,
+                    color: match.festival.glowColor,
+                  }}
                 >
                   {match.when === "today" ? "Today" : "Tomorrow"}
                 </span>
                 <span className="font-semibold">
                   {match.festival.emoji} {match.festival.name}
                 </span>
-                <p className="text-xs text-zinc-400 transition-colors group-hover:text-zinc-300">Tap to view →</p>
+                <p className="text-xs text-zinc-400 transition-colors group-hover:text-zinc-300">
+                  Tap to view →
+                </p>
               </div>
             </motion.div>
           </Link>

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import type { Festival } from "../../data/festivals";
+import StoryScroll from "../../components/story/StoryScroll";
+import AbhangVerses from "../../components/story/AbhangVerses";
 
 declare global {
   interface Window {
@@ -484,6 +486,9 @@ export default function FestivalPageClient({ festival }: { festival: Festival })
           </motion.div>
         </section>
       )}
+      <StoryScroll color={festival.glowColor} />
+      <AbhangVerses color={festival.glowColor} />
     </main>
+
   );
 }
