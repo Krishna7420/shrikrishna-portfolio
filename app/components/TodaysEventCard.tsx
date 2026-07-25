@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { festivals, type Festival } from "../data/festivals";
+import posthog from "posthog-js";
 
 function localDateKey(d: Date) {
   const y = d.getFullYear();
@@ -51,7 +52,10 @@ export default function TodaysEventCard() {
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           className="relative z-30 mx-auto mb-8 w-fit px-4 pt-28 sm:pt-32"
         >
-          <Link href={`/festival/${match.festival.slug}`}>
+          <Link
+            href={`/festival/${match.festival.slug}`}
+            onClick={() => posthog.capture("festival_card_clicked", { festival_name: match.festival.name, festival_slug: match.festival.slug, when: match.when })}
+          >
             <motion.div
               whileHover={{ scale: 1.03 }}
               className="glass group flex items-center gap-4 overflow-hidden rounded-2xl border p-3 pr-5 backdrop-blur-xl"

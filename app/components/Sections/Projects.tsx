@@ -9,6 +9,7 @@ import {
   useTransform,
   AnimatePresence,
 } from "framer-motion";
+import posthog from "posthog-js";
 
 const GITHUB_USERNAME = "Krishna7420";
 
@@ -331,6 +332,7 @@ function ProjectCard({
     setActive(true);
     setBurstKey((k) => k + 1);
     if (project.soundUrl) startSound();
+    posthog.capture("project_card_hovered", { project_title: project.title });
   };
 
   const handleMouseLeave = () => {
@@ -358,6 +360,7 @@ function ProjectCard({
     mx.set(0.5);
     my.set(0.35);
     if (project.soundUrl) startSound();
+    posthog.capture("project_card_hovered", { project_title: project.title, interaction: "tap" });
   };
 
   return (
@@ -457,6 +460,7 @@ function ProjectCard({
             <span
               onClick={(e) => {
                 e.stopPropagation();
+                posthog.capture("project_github_link_clicked", { project_title: project.title, url: project.url });
                 window.open(project.url, "_blank", "noopener,noreferrer");
               }}
               className={`cursor-pointer text-blue-400 transition-opacity hover:underline ${

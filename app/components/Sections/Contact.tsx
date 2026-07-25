@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import posthog from "posthog-js";
 
 /* ---------- EDIT with your real links ---------- */
 
@@ -52,6 +53,7 @@ function GhostOrb({
       href={contact.href}
       target={contact.href.startsWith("mailto") ? undefined : "_blank"}
       rel="noopener noreferrer"
+      onClick={() => posthog.capture("contact_link_clicked", { label: contact.label, type: contact.href.startsWith("mailto") ? "email" : "social" })}
       initial={{ opacity: 0, y: 50, filter: "blur(16px)", scale: 0.9 }}
       whileInView={{ opacity: 1, y: 0, filter: "blur(0px)", scale: 1 }}
       viewport={{ once: false, margin: "-20% 0px -20% 0px" }}
