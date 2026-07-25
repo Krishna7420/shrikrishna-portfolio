@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 const TG = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 const TG_FILE = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}`;
@@ -123,6 +124,19 @@ export async function POST(request: Request) {
       chatId,
       mediaUrl ? `✅ posted with ${mediaType}` : "✅ posted"
     );
+
+    const posthog = getPostHogClient();
+    if (posthog) {
+      posthog.capture({
+        distinctId: String(message.from?.id ?? "telegram-bot"),
+        event: "telegram_thought_posted",
+        properties: {
+          has_media: Boolean(mediaUrl),
+          media_type: mediaType ?? "text",
+        },
+      });
+      await posthog.flush();
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

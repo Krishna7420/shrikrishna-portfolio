@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import posthog from "posthog-js";
 
 /* ---------- Dope Live nav item ---------- */
 
@@ -50,13 +51,13 @@ export default function Navbar() {
 
       {/* Desktop pill */}
       <div className="glass hidden md:flex items-center gap-8 rounded-full px-8 py-4">
-        <Link href="#about">About</Link>
-        <Link href="#projects">Projects</Link>
-        <Link href="#experience">Experience</Link>
+        <Link href="#about" onClick={() => posthog.capture("nav_link_clicked", { label: "About" })}>About</Link>
+        <Link href="#projects" onClick={() => posthog.capture("nav_link_clicked", { label: "Projects" })}>Projects</Link>
+        <Link href="#experience" onClick={() => posthog.capture("nav_link_clicked", { label: "Experience" })}>Experience</Link>
         <LiveNavLink />
-        <Link href="#contact">Contact</Link>
-        <Link href="/privacy">Privacy</Link>
-        <Link href="/support">Support</Link>
+        <Link href="#contact" onClick={() => posthog.capture("nav_link_clicked", { label: "Contact" })}>Contact</Link>
+        <Link href="/privacy" onClick={() => posthog.capture("nav_link_clicked", { label: "Privacy" })}>Privacy</Link>
+        <Link href="/support" onClick={() => posthog.capture("nav_link_clicked", { label: "Support" })}>Support</Link>
       </div>
 
       {/* Mobile */}
@@ -94,21 +95,21 @@ export default function Navbar() {
           <div className="glass mt-3 flex flex-col gap-1 rounded-3xl p-4">
             <Link
               href="#about"
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); posthog.capture("nav_link_clicked", { label: "About", device: "mobile" }); }}
               className="rounded-2xl px-4 py-3 transition hover:bg-white/10"
             >
               About
             </Link>
             <Link
               href="#projects"
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); posthog.capture("nav_link_clicked", { label: "Projects", device: "mobile" }); }}
               className="rounded-2xl px-4 py-3 transition hover:bg-white/10"
             >
               Projects
             </Link>
             <Link
               href="#experience"
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); posthog.capture("nav_link_clicked", { label: "Experience", device: "mobile" }); }}
               className="rounded-2xl px-4 py-3 transition hover:bg-white/10"
             >
               Experience
@@ -120,21 +121,21 @@ export default function Navbar() {
 
             <Link
               href="#contact"
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); posthog.capture("nav_link_clicked", { label: "Contact", device: "mobile" }); }}
               className="rounded-2xl px-4 py-3 transition hover:bg-white/10"
             >
               Contact
             </Link>
             <Link
               href="/privacy"
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); posthog.capture("nav_link_clicked", { label: "Privacy", device: "mobile" }); }}
               className="rounded-2xl px-4 py-3 transition hover:bg-white/10"
             >
               Privacy
             </Link>
             <Link
               href="/support"
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); posthog.capture("nav_link_clicked", { label: "Support", device: "mobile" }); }}
               className="rounded-2xl px-4 py-3 transition hover:bg-white/10"
             >
               Support

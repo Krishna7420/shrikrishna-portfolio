@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Live from "../components/Sections/Live";
+import posthog from "posthog-js";
 
 /* ---------- Boot-up uplink sequence ---------- */
 
@@ -114,10 +115,15 @@ function Starfield() {
 export default function LivePageClient() {
   const [booted, setBooted] = useState(false);
 
+  const handleBooted = () => {
+    setBooted(true);
+    posthog.capture("live_page_viewed");
+  };
+
   return (
     <main className="relative min-h-svh overflow-hidden bg-black text-white pt-24">
       <AnimatePresence>
-        {!booted && <BootSequence onDone={() => setBooted(true)} />}
+        {!booted && <BootSequence onDone={handleBooted} />}
       </AnimatePresence>
 
       <Starfield />

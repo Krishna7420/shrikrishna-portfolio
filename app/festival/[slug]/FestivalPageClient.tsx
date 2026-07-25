@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Festival } from "../../data/festivals";
 import StoryScroll from "../../components/story/StoryScroll";
 import AbhangVerses from "../../components/story/AbhangVerses";
+import posthog from "posthog-js";
 
 declare global {
   interface Window {
@@ -288,9 +289,11 @@ function CornerMusicPlayer({
     if (playing) {
       playerRef.current.pauseVideo();
       setPlaying(false);
+      posthog.capture("festival_music_toggled", { action: "pause", track_index: trackIndex });
     } else {
       playerRef.current.playVideo();
       setPlaying(true);
+      posthog.capture("festival_music_toggled", { action: "play", track_index: trackIndex });
     }
   };
 
@@ -308,9 +311,11 @@ function CornerMusicPlayer({
       playerRef.current.unMute();
       playerRef.current.setVolume(45);
       setMuted(false);
+      posthog.capture("festival_music_mute_toggled", { action: "unmute" });
     } else {
       playerRef.current.mute();
       setMuted(true);
+      posthog.capture("festival_music_mute_toggled", { action: "mute" });
     }
   };
 
@@ -381,6 +386,7 @@ function CornerMusicPlayer({
 function EventCalendarCard({ festival, hasDarshan }: { festival: Festival; hasDarshan: boolean }) {
   const scrollToDarshan = () => {
     if (!hasDarshan) return;
+    posthog.capture("festival_darshan_scrolled_to", { festival_name: festival.name });
     document.getElementById("darshan")?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -426,6 +432,10 @@ export default function FestivalPageClient({ festival }: { festival: Festival })
   const activeTrack = festival.bhajanTracks?.find((t) => t.videoId === currentVideoId);
   const currentSongTitle =
     activeTrack?.segments.filter((s) => s.time <= currentTime).slice(-1)[0]?.title || "";
+
+  useEffect(() => {
+    posthog.capture("festival_page_viewed", { festival_name: festival.name, festival_slug: festival.slug, has_darshan: hasDarshan, has_music: hasMusic });
+  }, [festival.name, festival.slug, hasDarshan, hasMusic]);
 
   return (
     <main className="relative min-h-svh overflow-hidden bg-black text-white pt-24">
