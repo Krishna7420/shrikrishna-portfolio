@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import posthog from "posthog-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -78,6 +79,7 @@ function LikeButton({
     onToggle(thought.id);
     setCount((c) => (nowLiked ? c + 1 : Math.max(c - 1, 0)));
     if (nowLiked) setBurst((b) => b + 1);
+    posthog.capture("thought_liked", { thought_id: thought.id, action: nowLiked ? "like" : "unlike" });
 
     try {
       if (nowLiked) {
@@ -144,6 +146,7 @@ function ShareButton({ thought }: { thought: Thought }) {
     if (navigator.share) {
       try {
         await navigator.share(shareData);
+        posthog.capture("thought_shared", { thought_id: thought.id, method: "native" });
       } catch {
         // user cancelled — no-op
       }
@@ -152,6 +155,7 @@ function ShareButton({ thought }: { thought: Thought }) {
         await navigator.clipboard.writeText(shareUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 1800);
+        posthog.capture("thought_shared", { thought_id: thought.id, method: "clipboard" });
       } catch {}
     }
   };
@@ -472,6 +476,7 @@ export default function Live({ preview = false }: { preview?: boolean }) {
         >
           <Link
             href="/live"
+            onClick={() => posthog.capture("live_view_all_clicked")}
             className="glass group relative overflow-hidden rounded-2xl border border-white/10 px-8 py-4 font-semibold transition hover:scale-105 hover:shadow-[0_0_40px_rgba(59,130,246,0.3)]"
           >
             <span className="relative flex items-center gap-2">
@@ -495,7 +500,7 @@ export default function Live({ preview = false }: { preview?: boolean }) {
                   <motion.button
                     key={thought.id}
                     id={`t-${thought.id}`}
-                    onClick={() => setLightboxId(thought.id)}
+                    onClick={() => { setLightboxId(thought.id); posthog.capture("photo_lightbox_opened", { thought_id: thought.id }); }}
                     initial={{ opacity: 0, x: 30 }}
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: false, margin: "-10%" }}
