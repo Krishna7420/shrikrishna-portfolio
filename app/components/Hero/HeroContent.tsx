@@ -1,9 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
+import posthog from "posthog-js";
 
 export default function HeroContent() {
   const scrollToProjects = () => {
+    posthog.capture("hero_view_projects_clicked");
     document
       .getElementById("projects")
       ?.scrollIntoView({ behavior: "smooth" });
@@ -115,6 +117,7 @@ export default function HeroContent() {
           <a
             href="/Shrikrishna_Resume.pdf"
             download
+            onClick={() => posthog.capture("hero_resume_downloaded")}
             className="glass w-full sm:w-auto text-center rounded-2xl px-8 py-4 font-semibold transition hover:scale-105"
           >
             Download Resume
